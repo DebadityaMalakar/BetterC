@@ -1,41 +1,19 @@
-program BuildBetterC;
-
+program Build;
 uses SysUtils;
 
+procedure RunCommand(const Cmd: string; const Args: array of UnicodeString);
 begin
-  WriteLn('Building BetterC Compiler...');
-
-  // Compile Pascal Files
-  if Exec('fpc src\pascal\fileio.pas') <> 0 then
+  if ExecuteProcess(Cmd, Args) <> 0 then
   begin
-    WriteLn('Error: Failed to compile fileio.pas');
+    Writeln('Error running: ', Cmd);
     Halt(1);
   end;
+end;
 
-  if Exec('fpc src\pascal\tokenizer.pas') <> 0 then
-  begin
-    WriteLn('Error: Failed to compile tokenizer.pas');
-    Halt(1);
-  end;
-
-  if Exec('fpc src\pascal\main.pas -o build\BetterC.exe') <> 0 then
-  begin
-    WriteLn('Error: Failed to compile main.pas');
-    Halt(1);
-  end;
-
-  // Assemble & Link ASM Files
-  if Exec('nasm -f win32 src\asm\compiler.asm -o src\asm\compiler.obj') <> 0 then
-  begin
-    WriteLn('Error: Failed to assemble compiler.asm');
-    Halt(1);
-  end;
-
-  if Exec('gcc -m32 src\asm\compiler.obj -o build\compiler.exe -L. -lfileio -ltokenizer') <> 0 then
-  begin
-    WriteLn('Error: Failed to link compiler.asm');
-    Halt(1);
-  end;
-
-  WriteLn('Build complete. Executable created in build\BetterC.exe');
+begin
+  RunCommand('nasm', ['-f', 'elf64', 'src/asm/compiler.asm']);
+  RunCommand('fpc', ['-Mtp', '-Sg', '-O2', 'src/pascal/tokenizer.pas']);
+  RunCommand('fpc', ['-Mtp', '-Sg', '-O2', 'src/pascal/fileio.pas']);
+  RunCommand('fpc', ['-Mtp', '-Sg', '-O2', 'src/tools/build.pas']);
+  Writeln('Build completed.');
 end.

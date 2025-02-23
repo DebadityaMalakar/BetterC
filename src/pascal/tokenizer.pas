@@ -1,22 +1,25 @@
 library tokenizer;
 
-uses SysUtils;
+{$mode objfpc}  // Enables `Result` usage
+
+uses
+  SysUtils;
 
 type
   TokenType = (ttIdentifier, ttKeyword, ttNumber, ttString, ttOperator, ttSymbol, ttUnknown, ttEOF);
-
+  
   Token = record
     TokenType: TokenType;
-    Value: string;
+    Value: AnsiString;  // Use AnsiString for compatibility
   end;
 
 var
-  SourceCode: string;
+  SourceCode: AnsiString;
   Position: Integer;
 
 function IsAlpha(c: Char): Boolean;
 begin
-  IsAlpha := (c in ['a'..'z', 'A'..'Z', '_']);
+  IsAlpha := (c in ['a'..'z', 'A'..'Z', '_']);  // ✅ Use function name instead of Result
 end;
 
 function IsDigit(c: Char): Boolean;
@@ -32,33 +35,37 @@ end;
 function ReadNextToken: Token;
 var
   CurrentChar: Char;
-  TokenValue: string;
+  TokenValue: AnsiString;
+  TempToken: Token;
 begin
   while (Position <= Length(SourceCode)) and IsWhitespace(SourceCode[Position]) do
     Inc(Position);
-
+    
   if Position > Length(SourceCode) then
   begin
-    Result.TokenType := ttEOF;
-    Result.Value := '';
+    TempToken.TokenType := ttEOF;
+    TempToken.Value := '';
+    ReadNextToken := TempToken;  // ✅ Assign to function name
     Exit;
   end;
-
+  
   CurrentChar := SourceCode[Position];
-
+  
   if IsAlpha(CurrentChar) then
   begin
     TokenValue := '';
-    while (Position <= Length(SourceCode)) and (IsAlpha(SourceCode[Position]) or IsDigit(SourceCode[Position])) do
+    while (Position <= Length(SourceCode)) and 
+          (IsAlpha(SourceCode[Position]) or IsDigit(SourceCode[Position])) do
     begin
       TokenValue := TokenValue + SourceCode[Position];
       Inc(Position);
     end;
-    Result.TokenType := ttIdentifier;
-    Result.Value := TokenValue;
+    TempToken.TokenType := ttIdentifier;
+    TempToken.Value := TokenValue;
+    ReadNextToken := TempToken;
     Exit;
   end;
-
+  
   if IsDigit(CurrentChar) then
   begin
     TokenValue := '';
@@ -67,38 +74,55 @@ begin
       TokenValue := TokenValue + SourceCode[Position];
       Inc(Position);
     end;
-    Result.TokenType := ttNumber;
-    Result.Value := TokenValue;
+    TempToken.TokenType := ttNumber;
+    TempToken.Value := TokenValue;
+    ReadNextToken := TempToken;
     Exit;
   end;
-
-  Result.TokenType := ttUnknown;
-  Result.Value := CurrentChar;
+  
+  TempToken.TokenType := ttUnknown;
+  TempToken.Value := CurrentChar;
   Inc(Position);
+  ReadNextToken := TempToken;
 end;
 
-function Tokenize(Input: PChar): PChar; cdecl; export;
+function Tokenize(Input: PChar): PChar; export;
 const
   MAX_OUTPUT_SIZE = 1024;
 var
-  TokenizedData: PChar;
+  TokenizedData: array[0..MAX_OUTPUT_SIZE-1] of Char;
   Token: Token;
+  OutputPos: Integer;
+  i: Integer;
+  TempStr: AnsiString;
 begin
-  SourceCode := string(Input);
+  SourceCode := AnsiString(StrPas(Input));  // ✅ Convert PChar to AnsiString
   Position := 1;
-
-  TokenizedData := StrAlloc(MAX_OUTPUT_SIZE);
-  StrCopy(TokenizedData, '');
-
+  OutputPos := 0;
+  FillChar(TokenizedData, SizeOf(TokenizedData), 0);
+  
   repeat
     Token := ReadNextToken;
-    StrCat(TokenizedData, PChar(Token.Value + ' '));
+    
+    // Convert Token.Value to AnsiString before using PChar
+    TempStr := Token.Value + ' ';
+    
+    if (OutputPos + Length(TempStr) + 1) < MAX_OUTPUT_SIZE then
+    begin
+      for i := 1 to Length(TempStr) do
+      begin
+        TokenizedData[OutputPos] := TempStr[i];
+        Inc(OutputPos);
+      end;
+    end;
   until Token.TokenType = ttEOF;
-
-  Result := TokenizedData;
+  
+  TokenizedData[OutputPos] := #0;  // Null terminate
+  Tokenize := StrNew(PChar(TempStr));  // ✅ Convert AnsiString properly to PChar
 end;
 
-exports Tokenize;
+exports
+  Tokenize;
 
 begin
 end.
